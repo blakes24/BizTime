@@ -1,4 +1,4 @@
-\c biztime
+\c biztime_test
 DROP TABLE IF EXISTS invoices CASCADE;
 
 DROP TABLE IF EXISTS companies CASCADE;
@@ -34,24 +34,3 @@ CREATE TABLE companies_industries (
     PRIMARY KEY (comp_code, ind_code)
 );
 
-INSERT INTO companies
-    VALUES ('apple', 'Apple Computer', 'Maker of OSX.'), ('ibm', 'IBM', 'Big blue.');
-
-INSERT INTO invoices (comp_code, amt, paid, paid_date)
-    VALUES ('apple', 100, FALSE, NULL), ('apple', 200, FALSE, NULL), ('apple', 300, TRUE, '2018-01-01'), ('ibm', 400, FALSE, NULL);
-
-INSERT INTO industries
-    VALUES ('tech', 'Technology');
-
-INSERT INTO companies_industries (ind_code, comp_code)
-    VALUES ('tech', 'apple'), ('tech', 'ibm');
-
-SELECT
-    c.code,
-    c.name,
-    c.description,
-    i.industry
-FROM
-    companies AS c
-    LEFT JOIN companies_industries AS ci ON c.code = ci.comp_code
-    LEFT JOIN industries AS i ON ci.ind_code = i.code

@@ -15,7 +15,7 @@ router.get('/', async (req, res, next) => {
 router.get('/:id', async (req, res, next) => {
 	try {
 		const results = await db.query(
-			`SELECT * FROM invoices FULL JOIN companies ON invoices.comp_Code = companies.code WHERE id=$1`,
+			`SELECT * FROM invoices FULL JOIN companies ON invoices.comp_code = companies.code WHERE id=$1`,
 			[ req.params.id ]
 		);
 		if (results.rows.length === 0) {
@@ -40,12 +40,12 @@ router.get('/:id', async (req, res, next) => {
 
 router.post('/', async (req, res, next) => {
 	try {
-		const { comp_Code, amt } = req.body;
-		const results = await db.query(`INSERT INTO invoices (comp_Code, amt) VALUES ($1, $2) RETURNING *`, [
-			comp_Code,
+		const { comp_code, amt } = req.body;
+		const results = await db.query(`INSERT INTO invoices (comp_code, amt) VALUES ($1, $2) RETURNING *`, [
+			comp_code,
 			amt
 		]);
-		return res.json({ invoices: results.rows[0] });
+		return res.status(201).json({ invoice: results.rows[0] });
 	} catch (e) {
 		return next(e);
 	}
@@ -53,14 +53,28 @@ router.post('/', async (req, res, next) => {
 
 router.put('/:id', async (req, res, next) => {
 	try {
-		const results = await db.query(`UPDATE invoices SET amt = $1 WHERE id = $2 RETURNING *`, [
-			req.body.amt,
-			req.params.id
-		]);
+		const { amt, paid } = req.body;
+
+		const results = await db.query(`SELECT paid, paid_date FROM invoices WHERE id=$1`, [ req.params.id ]);
 		if (results.rows.length === 0) {
 			throw new ExpressError(`No such invoice: ${req.params.id}`, 404);
 		}
-		return res.json({ invoices: results.rows[0] });
+		let paid_date = results.rows[0].paid_date;
+		let checkPaid = results.rows[0].paid;
+
+		if (paid === true && checkPaid === false) {
+			paid_date = new Date();
+		}
+		if (paid === false) {
+			paid_date = null;
+		}
+
+		const putRes = await db.query(
+			`UPDATE invoices SET amt = $1, paid = $2, paid_date = $3 WHERE id = $4 RETURNING *`,
+			[ amt, paid, paid_date, req.params.id ]
+		);
+
+		return res.json({ invoice: putRes.rows[0] });
 	} catch (e) {
 		return next(e);
 	}

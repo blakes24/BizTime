@@ -2,6 +2,7 @@ const express = require('express');
 const ExpressError = require('../expressError');
 const router = express.Router();
 const db = require('../db');
+const slugify = require('slugify');
 
 router.get('/', async (req, res, next) => {
 	try {
@@ -14,18 +15,30 @@ router.get('/', async (req, res, next) => {
 
 router.get('/:code', async (req, res, next) => {
 	try {
-		const code = req.params.code;
-		const compRes = await db.query(`SELECT * FROM companies WHERE code=$1`, [ code ]);
-		const invRes = await db.query(`SELECT id FROM invoices WHERE comp_code = $1`, [ code ]);
+		const comp_code = req.params.code;
+		const compRes = await db.query(
+			`SELECT
+                c.code,
+                c.name,
+                c.description,
+                i.industry
+            FROM
+                companies AS c
+                LEFT JOIN companies_industries AS ci ON c.code = ci.comp_code
+                LEFT JOIN industries AS i ON ci.ind_code = i.code
+            WHERE c.code = $1`,
+			[ comp_code ]
+		);
+		const invRes = await db.query(`SELECT id FROM invoices WHERE comp_code = $1`, [ comp_code ]);
 
 		if (compRes.rows.length === 0) {
-			throw new ExpressError(`Company with code ${code} not found`, 404);
+			throw new ExpressError(`Company with code ${comp_code} not found`, 404);
 		}
-		const company = compRes.rows[0];
-		const invoices = invRes.rows;
-		company.invoices = invoices.map((i) => i.id);
+		const { code, name, description } = compRes.rows[0];
+		const industries = compRes.rows.map((i) => i.industry);
+		const invoices = invRes.rows.map((i) => i.id);
 
-		return res.json({ company: company });
+		return res.json({ company: { code, name, description, industries, invoices } });
 	} catch (e) {
 		return next(e);
 	}
@@ -33,12 +46,13 @@ router.get('/:code', async (req, res, next) => {
 
 router.post('/', async (req, res, next) => {
 	try {
-		const { code, name, description } = req.body;
+		const { name, description } = req.body;
+		const code = slugify(name, { lower: true, strict: true });
 		const results = await db.query(
 			`INSERT INTO companies (code, name, description) VALUES ($1, $2, $3) RETURNING *`,
 			[ code, name, description ]
 		);
-		return res.json({ company: results.rows[0] });
+		return res.status(201).json({ company: results.rows[0] });
 	} catch (e) {
 		return next(e);
 	}
